@@ -29,6 +29,7 @@ def test():
 
     # initialize log-log model
     llmodel = SpeedHeightModel(a=-0.36997977, b=1.21532975)
+    # llmodel = SpeedHeightModel()
 
     errors = []
     errors_ll = []
@@ -37,25 +38,24 @@ def test():
         pred_lstm = model(src)
         pred_lstm = pred_lstm.squeeze()
         error = trg-pred_lstm
-        print(error)
 
         errors = errors + error.tolist()
 
         # static model error
         src_nonorm, _ = nonorm_dataset[idx] 
-        vel = src_nonorm[:,1]
+        vel = src_nonorm[:,0]
         pred_ll = llmodel.v2dh(vel)
 
         error_ll = trg-pred_ll
 
         errors_ll = errors_ll + error_ll.tolist()
 
-        print(f'lstm error: {sum(error)/len(error)}')
-        print(f'll error:   {sum(error_ll)/len(error_ll)}')
+        # print(f'lstm error: {sum(error)/len(error)}')
+        # print(f'll error:   {sum(error_ll)/len(error_ll)}')
 
-    # print('-----------------')
-    # print(f'LSTM RMSE:    {rmse(errors)}')
-    # print(f'Log-Log RMSE: {rmse(errors_ll)}')
+    print('-----------------')
+    print(f'LSTM RMSE:    {rmse(errors)}')
+    print(f'Log-Log RMSE: {rmse(errors_ll)}')
 
 
 

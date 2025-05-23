@@ -11,7 +11,7 @@ def train():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # model parameters
-    INPUT_SIZE = 7
+    INPUT_SIZE = 6
     HIDDEN_SIZE = 32
     OUTPUT_SIZE = 1
     NUM_LAYERS = 1
