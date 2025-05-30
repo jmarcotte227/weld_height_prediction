@@ -6,12 +6,12 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
-from model import WeldLSTM
+from lstm_model import WeldLSTM
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-def train():
+def train(train_dataset, valid_dataset):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # model parameters
@@ -44,12 +44,6 @@ def train():
     # loss
     loss_fn = nn.MSELoss()
 
-    # load data
-    TRAIN_DATA_DIR = '../data/processed/CL_cold.npy'
-    VALID_DATA_DIR = '../data/processed/CL_hot.npy'
-
-    train_dataset = WeldDataset(TRAIN_DATA_DIR)
-    valid_dataset = WeldDataset(VALID_DATA_DIR, train_dataset.mean, train_dataset.std)
 
     train_dataloader = DataLoader(train_dataset,
                                   batch_size=BATCH_SIZE,
@@ -112,6 +106,7 @@ def train():
         # check if valid loss is better than best and save
         if valid_loss<best_loss:
             torch.save(model, f'saved_model.pt')
+            best_loss = valid_loss
 
         # print()
         # print(f'-----Epoch {epoch} Stats-----')
@@ -168,15 +163,14 @@ def rmse(e):
         sum += err**2
 
     return np.sqrt(sum/len(e))
+    # return sum/len(e)
 
-def test():
+def test(valid_dataset, nonorm_dataset):
     # load model
     model = torch.load('saved_model.pt')
     # load data
     VALID_DATA_DIR = '../data/processed/CL_hot.npy'
 
-    valid_dataset = WeldDataset(VALID_DATA_DIR)
-    nonorm_dataset = WeldDataset(VALID_DATA_DIR, norm=False)
 
     # initialize log-log model
     llmodel = SpeedHeightModel(a=-0.36997977, b=1.21532975)
@@ -198,7 +192,6 @@ def test():
         pred_ll = llmodel.v2dh(vel)
 
         error_ll = trg-pred_ll
-
         errors_ll = errors_ll + error_ll.tolist()
 
         # print(f'lstm error: {sum(error)/len(error)}')
@@ -257,5 +250,15 @@ class SpeedHeightModel:
                 self.p = self.p / self.beta - k @ k.T * r
 
 if __name__== '__main__':
-    train()
-    test()
+    # load data
+    TRAIN_DATA_DIR = '../data/lstm_processed/CL_cold.npy'
+    VALID_DATA_DIR = '../data/lstm_processed/CL_hot.npy'
+
+    train_dataset = WeldDataset(TRAIN_DATA_DIR)
+    valid_dataset = WeldDataset(VALID_DATA_DIR, train_dataset.mean, train_dataset.std)
+    nonorm_dataset = WeldDataset(VALID_DATA_DIR, norm=False)
+
+    # train model
+    train(train_dataset, valid_dataset)
+    # test model
+    test(valid_dataset, nonorm_dataset)

@@ -3,10 +3,10 @@ from scipy.io import loadmat
 
 # constants
 NUM_LAYERS = 105
-NUM_SEGS = 48
+NUM_SEGS = 46
 USED_PARTS = ['CL_cold', 'CL_hot']
 DTYPES = [
-          'vel_set',
+          # 'vel_set',
           'vel_calc',
           'avg_temp',
           # 'max_temp',
@@ -32,5 +32,5 @@ for part in USED_PARTS:
         for idx, key in enumerate(DTYPES):
             # recording all the parameters in the list above.
             # dh is the target and will be used in the las
-            seq_list[layer, :,idx] = layer_data[key]
-    np.save(f'processed/{part}.npy', seq_list)
+            seq_list[layer, :,idx] = layer_data[key][1:-1]
+    np.save(f'rnn_processed/{part}.npy', seq_list)
