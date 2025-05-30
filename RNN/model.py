@@ -6,12 +6,14 @@ class WeldLSTM(nn.Module):
                  hidden_size = 1024,
                  output_size = 1,
                  num_layers = 1,
+                 dropout = 0
                  ):
         super().__init__()
         self.lstm=nn.LSTM(input_size=input_size,
                           hidden_size=hidden_size,
                           num_layers=num_layers,
-                          batch_first=True
+                          batch_first=True,
+                          dropout = dropout
                           )
         self.linear = nn.Linear(in_features=hidden_size,
                                 out_features=output_size)

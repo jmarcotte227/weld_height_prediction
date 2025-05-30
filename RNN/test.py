@@ -7,6 +7,7 @@ from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 from model import WeldLSTM
+from train import WeldDataset
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -59,30 +60,7 @@ def test():
 
 
 
-class WeldDataset(Dataset):
-    '''
-    To be used with the processed files from a welding run.
-    '''
-    def __init__(self,filepath,norm=True):
 
-        data = np.load(filepath)
-        print(data.shape)
-        self.trg = torch.Tensor(data[:,:,-1])
-        self.src = torch.Tensor(data[:,:,:-1])
-        
-        # fliter nan values
-        self.trg = torch.nan_to_num(self.trg)
-        self.src = torch.nan_to_num(self.src)
-
-        # normalize
-        if norm: 
-            self.src = nn.functional.normalize(self.src)
-
-    def __len__(self):
-        return self.trg.shape[0]
-
-    def __getitem__(self, idx):
-        return self.src[idx,:,:], self.trg[idx,:]
 class SpeedHeightModel:
     """
     Model relating dh to torch speed according to the equation
