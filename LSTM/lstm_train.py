@@ -15,7 +15,7 @@ def train(train_dataset, valid_dataset):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # model parameters
-    INPUT_SIZE = 2
+    INPUT_SIZE = 4
     HIDDEN_SIZE = 8
     OUTPUT_SIZE = 1
     NUM_LAYERS = 1
@@ -133,15 +133,21 @@ class WeldDataset(Dataset):
         self.std = std
         
         data = np.load(filepath)
-        self.trg = torch.Tensor(data[:,:,-1])
-        self.src = torch.Tensor(data[:,:,:-1])
+        self.trg = torch.Tensor(data[:,1:,-1])
+        self.src = np.zeros((data.shape[0], data.shape[1]-1,data.shape[2]))
+
+        # right shift the set point
+        self.src[:,:,0] = data[:,1:,0]
+        # trim the last measurement
+        self.src[:,:,1:] = data[:,:-1,1:]
+        self.src = torch.Tensor(self.src)
         
         # fliter nan values
         self.trg = torch.nan_to_num(self.trg)
         self.src = torch.nan_to_num(self.src)
 
         # normalize
-        temp_data = torch.reshape(self.src, (-1,2))
+        temp_data = torch.reshape(self.src, (-1,4))
         if self.mean is None:
             self.mean = temp_data.mean(dim=0)
             self.std = temp_data.std(dim=0)

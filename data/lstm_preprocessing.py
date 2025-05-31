@@ -7,7 +7,7 @@ NUM_SEGS = 46
 USED_PARTS = ['CL_cold', 'CL_hot']
 DTYPES = [
           'vel_set',
-          # 'vel_calc',
+          'vel_calc',
           'avg_temp',
           # 'max_temp',
           # 'voltage',

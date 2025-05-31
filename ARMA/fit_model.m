@@ -16,3 +16,11 @@ orders = [na,nb,nk];
 
 model = arx(data, orders);
 
+% extract data and predict
+K=4;
+yp = predict(model, data(:,:,:,1), K);
+
+plot(yp)
+hold on
+plot(data)
+
