@@ -265,6 +265,6 @@ if __name__== '__main__':
     nonorm_dataset = WeldDataset(VALID_DATA_DIR, norm=False)
 
     # train model
-    train(train_dataset, valid_dataset)
+    # train(train_dataset, valid_dataset)
     # test model
     test(valid_dataset, nonorm_dataset)
