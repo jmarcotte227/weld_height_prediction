@@ -15,7 +15,7 @@ def train(train_dataset, valid_dataset):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # model parameters
-    INPUT_SIZE = 4
+    INPUT_SIZE = 1
     HIDDEN_SIZE = 8
     OUTPUT_SIZE = 1
     NUM_LAYERS = 1
@@ -70,7 +70,7 @@ def train(train_dataset, valid_dataset):
         for src,trg in train_dataloader:
             src = src.to(device)
             trg = trg.to(device)
-            pred = model(src)
+            pred = model(torch.unsqueeze(src[:,:,0],dim=2))
 
             # squeeze to eliminate dimension of size 1
             pred = torch.squeeze(pred, 2)
@@ -88,7 +88,7 @@ def train(train_dataset, valid_dataset):
             src = src.to(device)
             trg = trg.to(device)
 
-            pred = model(src)
+            pred = model(torch.unsqueeze(src[:,:,0],dim=2))
 
             # squeeze to eliminate dimension of size 1
             pred = torch.squeeze(pred, 2)
@@ -105,7 +105,7 @@ def train(train_dataset, valid_dataset):
 
         # check if valid loss is better than best and save
         if valid_loss<best_loss:
-            torch.save(model, f'saved_model.pt')
+            torch.save(model, f'saved_model_vset.pt')
             best_loss = valid_loss
 
         # print()
@@ -173,7 +173,7 @@ def rmse(e):
 
 def test(valid_dataset, nonorm_dataset):
     # load model
-    model = torch.load('saved_model.pt')
+    model = torch.load('saved_model_vset.pt')
     # load data
     VALID_DATA_DIR = '../data/processed/CL_hot.npy'
 
@@ -185,8 +185,9 @@ def test(valid_dataset, nonorm_dataset):
     errors = []
     errors_ll = []
     for idx, (src,trg) in enumerate(valid_dataset):
+        print(src.shape)
         # lstm error
-        pred_lstm = model(src)
+        pred_lstm = model(torch.unsqueeze(src[:,0], dim=1))
         pred_lstm = pred_lstm.squeeze()
         error = trg-pred_lstm
 
@@ -200,6 +201,12 @@ def test(valid_dataset, nonorm_dataset):
         error_ll = trg-pred_ll
         errors_ll = errors_ll + error_ll.tolist()
 
+        if False:
+            fig,ax = plt.subplots(1,1)
+            ax.plot(trg)
+            ax.plot(pred_lstm.detach())
+            ax.plot(pred_ll)
+            plt.show()
         # print(f'lstm error: {sum(error)/len(error)}')
         # print(f'll error:   {sum(error_ll)/len(error_ll)}')
 
