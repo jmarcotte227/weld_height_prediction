@@ -15,7 +15,7 @@ def train(train_dataset, valid_dataset):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # model parameters
-    INPUT_SIZE = 4
+    INPUT_SIZE = 1
     HIDDEN_SIZE = 8
     OUTPUT_SIZE = 1
     NUM_LAYERS = 1
@@ -70,7 +70,10 @@ def train(train_dataset, valid_dataset):
         for src,trg in train_dataloader:
             src = src.to(device)
             trg = trg.to(device)
-            pred = model(src)
+            # pred = model(src[:,:,[0,2]])
+            # pred = model(src[:,:,:3])
+            pred = model(torch.unsqueeze(src[:,:,0],dim=2))
+            # pred = model(src)
 
             # squeeze to eliminate dimension of size 1
             pred = torch.squeeze(pred, 2)
@@ -88,7 +91,10 @@ def train(train_dataset, valid_dataset):
             src = src.to(device)
             trg = trg.to(device)
 
-            pred = model(src)
+            # pred = model(src)
+            # pred = model(src[:,:,[0,2]])
+            # pred = model(src[:,:,:3])
+            pred = model(torch.unsqueeze(src[:,:,0],dim=2))
 
             # squeeze to eliminate dimension of size 1
             pred = torch.squeeze(pred, 2)
@@ -105,7 +111,7 @@ def train(train_dataset, valid_dataset):
 
         # check if valid loss is better than best and save
         if valid_loss<best_loss:
-            torch.save(model, f'saved_model.pt')
+            torch.save(model, f'saved_model_vset.pt')
             best_loss = valid_loss
 
         # print()
@@ -173,7 +179,7 @@ def rmse(e):
 
 def test(valid_dataset, nonorm_dataset):
     # load model
-    model = torch.load('saved_model.pt')
+    model = torch.load('saved_model_vset.pt')
 
     # initialize log-log model
     llmodel = SpeedHeightModel(a=-0.36997977, b=1.21532975)
@@ -183,7 +189,10 @@ def test(valid_dataset, nonorm_dataset):
     errors_ll = []
     for idx, (src,trg) in enumerate(valid_dataset):
         # lstm error
-        pred_lstm = model(src)
+        # pred_lstm = model(src[:,[0,2]])
+        # pred_lstm = model(src[:,:3])
+        pred_lstm = model(torch.unsqueeze(src[:,0], dim=1))
+        # pred_lstm = model(src)
         pred_lstm = pred_lstm.squeeze()
         error = trg-pred_lstm
 
@@ -201,8 +210,10 @@ def test(valid_dataset, nonorm_dataset):
         # print(f'll error:   {sum(error_ll)/len(error_ll)}')
 
     print('-----------------')
+    print(f'RNN MAE:     {mae(errors)}')
     print(f'RNN RMSE:    {rmse(errors)}')
-    print(f'Log-Log RMSE: {rmse(errors_ll)}')
+    print(f'RNN max:     {max(errors)}')
+    print(f'Log-Log RMSE:{rmse(errors_ll)}')
 
 class SpeedHeightModel:
     """
@@ -252,6 +263,12 @@ class SpeedHeightModel:
                 self.coeff_mat = self.coeff_mat + k @ e
                 self.p = self.p / self.beta - k @ k.T * r
 
+def mae(e):
+    sum = 0
+    for err in e:
+        sum+=np.abs(err)
+    return sum/len(e)
+
 if __name__== '__main__':
     # load data
     TRAIN_DATA_DIR = '../data/rnn_processed/CL_cold.npy'
@@ -267,6 +284,6 @@ if __name__== '__main__':
     nonorm_dataset = WeldDataset(VALID_DATA_DIR, norm=False)
 
     # train model
-    # train(train_dataset, valid_dataset)
+    train(train_dataset, valid_dataset)
     # test model
     test(valid_dataset, nonorm_dataset)

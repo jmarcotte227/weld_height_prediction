@@ -1,6 +1,7 @@
 import sys
 import time
 import numpy as np
+from copy import deepcopy
 import matplotlib.pyplot as plt
 import torch
 from scipy.optimize import minimize, Bounds
@@ -28,7 +29,9 @@ if __name__=='__main__':
     v_min =     3
     v_max =     17
 
-    dh_nom =    0.5
+    dh_nom =    1.67
+    dh_max =    1.859
+    dh_min =    1.486
 
     # load model
     lstm = torch.load('../LSTM/saved_model_vset.pt')
@@ -38,29 +41,47 @@ if __name__=='__main__':
     mean = torch.load('../LSTM/mean.pt')[0]
     std = torch.load('../LSTM/std.pt')[0]
     v_min = standardize(v_min,mean,std)
-    print(v_min)
+    # print(v_min)
     v_max = standardize(v_max,mean,std)
-    print(v_max)
+    # print(v_max)
     # print(mean)
     # print(std)
 
     # setup optimization
     # bounds = Bounds(V_MIN, V_MAX)
-    v_T = 5*torch.ones(VEC_LEN, dtype=torch.float32)
+    v_T = 10*torch.ones(VEC_LEN, dtype=torch.float32)
     v_T = standardize(v_T, mean, std)
+
+    # cosine deposition profile
+    cos_dh = (dh_min-dh_max)/2*np.cos(2*np.pi/(VEC_LEN-1)*np.arange(0,VEC_LEN))+(dh_max+dh_min)/2
 
     # target deposition
     dh_des = torch.unsqueeze(torch.tensor(dh_nom*np.ones(45), dtype=torch.float32), dim=1)
+    # dh_des = torch.unsqueeze(torch.tensor(cos_dh, dtype=torch.float32), dim=1)
 
     # setup input as parameter with grad
     v_T = torch.nn.Parameter(torch.unsqueeze(v_T, dim=1), requires_grad=True)
     optim = torch.optim.SGD([v_T], lr=5e-1)
     mse = torch.nn.MSELoss()
 
+    # intialize prediction
+    res = deepcopy(dh_des)
 
-    num_steps = 5000
+    num_steps = 10000
 
-    for _ in range(num_steps):
+    for idx in range(num_steps):
+        if idx in [1,100,1000,5000]:
+            fig,ax = plt.subplots(2,1)
+
+            ax[0].plot(dh_des.detach(), 'r--')
+            ax[0].plot(res.detach(), 'b')
+            ax[0].set_ylim([0,2.5])
+            ax[0].set_ylabel("$\Delta\hat{h}$ (mm)")
+            ax[1].plot(v_T.detach()*std+mean, 'b')
+            ax[1].set_ylim([3,17])
+            ax[1].set_ylabel("$v_T$ (mm/s)")
+            ax[0].set_title(f"Velocity Profile Generation: Iteration {idx}")
+            plt.show()
         res = lstm(v_T)
         loss = mse(res, dh_des)
         loss.backward()
@@ -78,8 +99,12 @@ if __name__=='__main__':
     # ploting result
     fig,ax = plt.subplots(2,1)
 
-    ax[0].plot(dh_des.detach())
-    ax[0].plot(dh_pred.detach())
-    ax[0].set_ylim([0,3])
-    ax[1].plot(vel_out.detach())
+    ax[0].plot(dh_des.detach(), 'r--')
+    ax[0].plot(dh_pred.detach(), 'b')
+    ax[0].set_ylim([0,2.5])
+    ax[0].set_ylabel("$\Delta\hat{h}$ (mm)")
+    ax[1].plot(vel_out.detach(), 'b')
+    ax[1].set_ylim([3,17])
+    ax[1].set_ylabel("$v_T$ (mm/s)")
+    ax[0].set_title(f"Velocity Profile Generation: Iteration {idx}")
     plt.show()
