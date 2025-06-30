@@ -18,8 +18,11 @@ class WeldLSTM(nn.Module):
         self.linear = nn.Linear(in_features=hidden_size,
                                 out_features=output_size)
 
-    def forward(self,src):
-        output, state = self.lstm(src)
-        output = self.linear(output)
-
-        return output
+    def forward(self,src, hidden_state = None):
+        if hidden_state is None:
+            output, state = self.lstm(src)
+            output = self.linear(output)
+        else:
+            output, state = self.lstm(src,hidden_state)
+            output = self.linear(output)
+        return output, state

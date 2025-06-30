@@ -281,9 +281,12 @@ if __name__== '__main__':
     VALID_DATA_DIR = '../data/lstm_processed/CL_hot.npy'
 
     train_dataset = WeldDataset(TRAIN_DATA_DIR)
+    print(train_dataset.mean)
+    print(train_dataset.std)
     valid_dataset = WeldDataset(VALID_DATA_DIR, train_dataset.mean, train_dataset.std)
     nonorm_dataset = WeldDataset(VALID_DATA_DIR, norm=False)
 
+    exit()
     # train model
     train(train_dataset, valid_dataset)
     # test model

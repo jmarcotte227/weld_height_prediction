@@ -226,13 +226,20 @@ def test(valid_dataset, nonorm_dataset):
         error_ll = trg_nonorm[:,1]-pred_ll
         errors_ll = errors_ll + error_ll.tolist()
 
-        if False:
+        if idx in [15,50,95]:
             fig,ax = plt.subplots(2,1)
             ax[0].plot(trg_nonorm[:,1])
             ax[0].plot(pred_std.detach()[:,1])
             ax[0].plot(pred_ll)
             ax[1].plot(trg_nonorm[:,0])
             ax[1].plot(pred_std.detach()[:,0])
+            ax[0].set_title(f"Layer {idx}")
+            ax[0].set_ylabel("v_T (mm/s)")
+            ax[1].set_ylabel("Temp. (brightness)")
+            ax[1].set_xlabel("Segment No.")
+            ax[0].legend(["Measured", "LSTM", "Log-Log"])
+            ax[0].set_ylim([0,4])
+            ax[1].set_ylim([14000,15750])
             plt.show()
         # print(f'lstm error: {sum(error)/len(error)}')
         # print(f'll error:   {sum(error_ll)/len(error_ll)}')
@@ -321,6 +328,6 @@ if __name__== '__main__':
     nonorm_dataset = WeldDataset(VALID_DATA_DIR, norm=False)
 
     # train model
-    train(train_dataset, valid_dataset)
+    # train(train_dataset, valid_dataset)
     # test model
     test(valid_dataset, nonorm_dataset)
