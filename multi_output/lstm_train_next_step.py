@@ -22,7 +22,7 @@ def train(train_dataset, valid_dataset):
 
     # hyper parameters
     BATCH_SIZE = 20
-    MAX_EPOCH = 400
+    MAX_EPOCH = 2000
     LR = 0.005
     WD = 0.0001
     DROPOUT = 0
@@ -70,13 +70,8 @@ def train(train_dataset, valid_dataset):
         for src,trg in train_dataloader:
             src = src.to(device)
             trg = trg.to(device)
-            # print(src.shape)
-            # print(trg.shape)
-            pred = model(src[:,:,[0,2,3]])
 
-            # pred= model(torch.unsqueeze(src[:,:,0], dim=2))
-            # squeeze to eliminate dimension of size 1
-            # pred = torch.squeeze(pred, 2)
+            pred = model(src[:,:,[0,2,3]])
 
             optimizer.zero_grad()
             loss = loss_fn(pred, trg)
@@ -92,12 +87,11 @@ def train(train_dataset, valid_dataset):
             src = src.to(device)
             trg = trg.to(device)
 
+            # vset, avg temp, dh
             pred = model(src[:,:,[0,2,3]])
 
-            # squeeze to eliminate dimension of size 1
-            # pred = torch.squeeze(pred, 2)
-            # print(pred.shape)
-            loss = loss_fn(pred, trg.squeeze())
+            # pred = torch.squeeze(pred,0)
+            loss = loss_fn(pred, torch.squeeze(trg))
 
             valid_loss.append(loss.item())
 
@@ -121,6 +115,7 @@ def train(train_dataset, valid_dataset):
 
     print("----- Final Results -----")
     print(f'Min Valid Loss: {min(valid_losses)}')
+    print(f'Epoch: {valid_losses.index(min(valid_losses))}')
     print(f'Epoch: {valid_losses.index(min(valid_losses))}')
 
     fig,ax = plt.subplots()
@@ -189,6 +184,7 @@ def test(valid_dataset, nonorm_dataset):
     # load model
     model = torch.load('saved_model_8_next_step.pt')
     model.eval()
+    # model.train()
     # load data
     VALID_DATA_DIR = '../data/processed/CL_hot.npy'
 
@@ -198,73 +194,153 @@ def test(valid_dataset, nonorm_dataset):
     # llmodel = SpeedHeightModel()
 
     seq_len = valid_dataset[0][1].shape[0]
-    # print(seq_len)
-    errors = np.zeros((len(valid_dataset)*seq_len, 2))
-    errors_z = np.zeros((len(valid_dataset)*seq_len, 2))
-    errors_ll = []
-    for idx, (src,trg) in enumerate(valid_dataset):
-        print(src.shape)
-        src_nonorm, trg_nonorm = nonorm_dataset[idx] 
-        # print(src[:,:2].shape)
-        # lstm error
-        # pred_lstm = model(src[:,[0,2]])
-        # pred_lstm = model(src[:,:3])
-        pred_lstm = model(torch.unsqueeze(src[:,[0,2,3]], dim=0))
-        # pred_lstm = model(torch.unsqueeze(src[:,0], dim=1))
-        # pred_lstm = pred_lstm.squeeze()
-        pred_std =pred_lstm.detach()*valid_dataset.std[2:]+valid_dataset.mean[2:]
+    pred_err_array = np.empty((seq_len,seq_len))
+    pred_err_array.fill(np.nan)
+    pred_err_array_mod = np.empty((seq_len,seq_len))
+    pred_err_array_mod.fill(np.nan)
+    ll_pred_err_array = np.zeros(seq_len)
+    for start_seg in range(25,seq_len):
+        errors = np.zeros((len(valid_dataset),seq_len, 2))
+        errors_z = np.zeros((len(valid_dataset)*seq_len, 2))
+        errors_ll = np.zeros((len(valid_dataset), seq_len))
+        for idx, (src,trg) in enumerate(valid_dataset):
+            src_nonorm, trg_nonorm = nonorm_dataset[idx] 
+            # lstm error
+            # pred_lstm = model(src[:,[0,2]])
+            # pred_lstm = model(src[:,:3])
+            pred_lstm = model(torch.unsqueeze(src[:,[0,2,3]], dim=0), start_seg)
+            # pred_lstm = model(torch.unsqueeze(src[:,0], dim=1))
+            # pred_lstm = pred_lstm.squeeze()
+            pred_std =pred_lstm.detach()*valid_dataset.std[2:]+valid_dataset.mean[2:]
 
-        error = trg_nonorm-pred_std
-        error = np.reshape(error, (-1,2))
-        errors[(idx)*seq_len:(idx+1)*seq_len,:] = error
+            error = trg_nonorm-pred_std
+            # error = np.reshape(error, (-1,2))
+            errors[(idx),:,:] = error
 
-        #z errors
-        error_z = trg-(pred_lstm.detach())
-        error_z = np.reshape(error_z, (-1,2))
-        errors_z[(idx)*seq_len:(idx+1)*seq_len,:] = error_z
+            #z errors
+            error_z = trg-(pred_lstm.detach())
+            error_z = np.reshape(error_z, (-1,2))
+            errors_z[(idx)*seq_len:(idx+1)*seq_len,:] = error_z
 
-        # static model error
-        vel = src_nonorm[:,0]
-        pred_ll = llmodel.v2dh(vel)
+            # static model error
+            vel = src_nonorm[:,0]
+            pred_ll = llmodel.v2dh(vel)
 
-        error_ll = trg_nonorm[:,1]-pred_ll
-        errors_ll = errors_ll + error_ll.tolist()
+            error_ll = trg_nonorm[:,1]-pred_ll
+            errors_ll[idx,:] = error_ll
+            # print(f"e{rmse(trg_nonorm[:,1]-pred_std.detach()[:,1])}")
 
-        if idx in [15,50,95]:
-            fig,ax = plt.subplots(2,1)
-            ax[0].plot(trg_nonorm[:,1])
-            ax[0].plot(pred_std.detach()[:,1])
-            ax[0].plot(pred_ll)
-            ax[1].plot(trg_nonorm[:,0])
-            ax[1].plot(pred_std.detach()[:,0])
-            ax[0].set_title(f"Layer {idx}")
-            ax[0].set_ylabel("v_T (mm/s)")
-            ax[1].set_ylabel("Temp. (brightness)")
-            ax[1].set_xlabel("Segment No.")
-            ax[0].legend(["Measured", "LSTM", "Log-Log"])
-            ax[0].set_ylim([0,4])
-            ax[1].set_ylim([14000,15750])
-            plt.show()
-        # print(f'lstm error: {sum(error)/len(error)}')
-        # print(f'll error:   {sum(error_ll)/len(error_ll)}')
+            if idx in [15,50,95]:
+                print(trg_nonorm.shape)
+                print(pred_std.shape)
+                fig,ax = plt.subplots(2,1)
+                ax[0].plot(trg_nonorm[:,1])
+                ax[0].plot(pred_std[:,1])
+                # ax[0].plot(pred_ll)
+                # ax[0].plot(trg_nonorm[0,1]-pred_std[0,:,1])
+                ax[1].plot(trg_nonorm[:,0])
+                ax[1].plot(pred_std[:,0])
+                ax[0].set_title(f"Layer {idx}")
+                ax[0].set_ylim([-0.5,4])
+                ax[0].plot([25,25], [-2,4])
+                # ax[1].set_ylim([14000,15750])
+                ax[1].set_xlabel("Segment Index")
+                ax[0].set_ylabel("dh (mm)")
+                ax[1].set_ylabel("Brightness")
+                ax[0].legend(["Measured", "Predicted"])
+                plt.show()
+            print(f'lstm error: {sum(error)/len(error)}')
+            print(f'll error:   {sum(error_ll)/len(error_ll)}')
 
-    print('--------Height Error---------')
-    print(f'LSTM MAE:     {mae(errors[:,1])}')
-    print(f'LSTM RMSE:    {rmse(errors[:,1])}')
-    print(f'LSTM max:     {np.max(errors[:,1])}')
-    print(f'Log-Log RMSE: {rmse(errors_ll)}')
-    print('--------Height Error Z---------')
-    print(f'mean:         {np.mean(errors_z[:,1])}')
-    print(f'std-dev:      {np.std(errors_z[:,1])}')
+        # print('--------Height Error---------')
+        # print(f'LSTM MAE:     {mae(errors[:,1])}')
+        # print(f'LSTM RMSE:    {rmse(errors[:,1])}')
+        # print(f'LSTM max:     {np.max(errors[:,1])}')
+        # print(f'Log-Log RMSE: {rmse(errors_ll)}')
+        # print('--------Height Error Z---------')
+        # print(f'mean:         {np.mean(errors_z[:,1])}')
+        # print(f'std-dev:      {np.std(errors_z[:,1])}')
 
-    print()
-    print('--------Temp Error---------')
-    print(f'LSTM MAE:     {mae(errors[:,0])}')
-    print(f'LSTM RMSE:    {rmse(errors[:,0])}')
-    print(f'LSTM max:     {np.max(errors[:,0])}')
-    print('--------Temp Error Z---------')
-    print(f'mean:         {np.mean(errors_z[:,0])}')
-    print(f'std-dev:      {np.std(errors_z[:,0])}')
+        # print()
+        # print('--------Temp Error---------')
+        # print(f'LSTM MAE:     {mae(errors[:,0])}')
+        # print(f'LSTM RMSE:    {rmse(errors[:,0])}')
+        # print(f'LSTM max:     {np.max(errors[:,0])}')
+        # print('--------Temp Error Z---------')
+        # print(f'mean:         {np.mean(errors_z[:,0])}')
+        # print(f'std-dev:      {np.std(errors_z[:,0])}')
+
+
+        num_layers = 105
+        error_at_pred = np.zeros(seq_len-start_seg)
+        for i in range(seq_len-start_seg):
+            temp_errors = np.zeros(num_layers)
+            for j in range(num_layers):
+                temp_errors[j] = errors[j,start_seg+i, 1]
+            error_at_pred[i] = rmse(temp_errors)
+        # pred_err_array[start_seg, :seq_len-start_seg]= error_at_pred
+        pred_err_array[start_seg, start_seg:]= error_at_pred
+        pred_err_array_mod[start_seg, :seq_len-start_seg] = error_at_pred
+    # calculate log-log error
+    for i in range(seq_len):
+        ll_pred_err_array[i] = rmse(errors_ll[:,i])
+
+    # calculate minimum
+    min_val = np.nanmin(pred_err_array)
+    print(min_val)
+    # min_val = min(min_val, np.min(ll_pred_err_array))
+    max_val = np.nanmax(pred_err_array)
+    print(max_val)
+    # max_val = max(max_val, np.max(ll_pred_err_array))
+
+
+    # fig,ax = plt.subplots(2,1, sharex=True)
+    # im = ax[0].imshow(pred_err_array, 
+    #                   vmin = min_val,
+    #                   vmax = max_val,
+    #                   aspect='auto')
+    # im2 = ax[1].imshow(np.expand_dims(ll_pred_err_array,axis=0),
+    #                    vmin = min_val,
+    #                    vmax = max_val,
+    #                    aspect='auto')
+    # ax[1].set_xlabel("Steps Ahead")
+    # ax[0].set_ylabel("Prediction Starting Step")
+    # ax[0].set_title("Prediction Error, Spaitial")
+    # cbar = fig.colorbar(im, ax=ax.ravel().tolist())
+    # cbar.set_label("RMSE Error (mm)")
+    # plt.show()
+    fig,ax = plt.subplots()
+    ax.plot(np.nanmean(pred_err_array_mod, axis=0))
+    plt.show()
+    fig,ax = plt.subplots()
+    ax.plot(np.nanmean(pred_err_array_mod, axis=1))
+    plt.show()
+
+    fig,ax = plt.subplots()
+    im = ax.imshow(pred_err_array, 
+                      vmin = min_val,
+                      vmax = max_val,
+                      )
+    ax.set_xlabel("Steps Ahead")
+    ax.set_ylabel("Prediction Starting Step")
+    ax.set_title("Prediction Error, spatial")
+    cbar = fig.colorbar(im)
+    cbar.set_label("RMSE Error (mm)")
+    plt.show()
+
+    fig,ax = plt.subplots()
+    im = ax.imshow(pred_err_array_mod, 
+                      vmin = min_val,
+                      vmax = max_val,
+                      )
+    ax.set_xlabel("Steps Ahead")
+    ax.set_ylabel("Prediction Starting Step")
+    ax.set_title("Prediction Error, steps_ahead")
+    cbar = fig.colorbar(im)
+    cbar.set_label("RMSE Error (mm)")
+    plt.show()
+
+    # analyzing trend of errors
 
     # plt.hist(errors_z[:,1],bins=40)
     # plt.show()
@@ -332,6 +408,6 @@ if __name__== '__main__':
     nonorm_dataset = WeldDataset(VALID_DATA_DIR, norm=False)
 
     # train model
-    train(train_dataset, valid_dataset)
+    # train(train_dataset, valid_dataset)
     # test model
     test(valid_dataset, nonorm_dataset)

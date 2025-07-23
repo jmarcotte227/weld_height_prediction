@@ -22,7 +22,7 @@ class WeldLSTM(nn.Module):
         self.linear = nn.Linear(in_features=hidden_size,
                                 out_features=output_size)
 
-    def forward(self,src):
+    def forward(self, src, start_step = 0):
         if self.training:
             output, state = self.lstm(src)
             output = self.linear(output)
@@ -35,16 +35,29 @@ class WeldLSTM(nn.Module):
             # print("Working Output")
             # print(output.shape)
             state = None
-            for idx, val in enumerate(src[0]):
+            # check if iteration starts after the firs step
+            # allows lookahead while maintaining previous use
+            if start_step > 0:
+                temp_out, state = self.lstm(src[:,:start_step])
+                # print(state)
+                state = (state[0][0,:,:], state[1][0,:,:])
+                # print(state)
+                # print("temp_out: ",temp_out.shape)
+                output[:start_step,:] = self.linear(temp_out)
+
+            for idx, val in enumerate(src[0][start_step:]):
+                # print("val: ", val.shape)
                 val_temp = val.unsqueeze(0)
                 if state is None:
                     out, state = self.lstm(val_temp)
                     output[idx,:] = self.linear(out)
                 else:
                     # construct input from previous output
-                    _input = torch.Tensor([[val_temp[:,0], output[idx-1,0], output[idx-1,0]]])
+                    _input = torch.Tensor([[val_temp[:,0],
+                                            output[idx+start_step-1,0],
+                                            output[idx+start_step-1,1]]])
                     out, state = self.lstm(_input, state)
-                    output[idx,:] = self.linear(out)
+                    output[idx+start_step,:] = self.linear(out)
 
         return output
 
