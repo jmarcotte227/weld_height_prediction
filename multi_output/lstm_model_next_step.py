@@ -22,7 +22,7 @@ class WeldLSTM(nn.Module):
         self.linear = nn.Linear(in_features=hidden_size,
                                 out_features=output_size)
 
-    def forward(self, src, start_step = 0):
+    def forward(self, src, start_step = 0, stop_seq = False):
         if self.training:
             output, state = self.lstm(src)
             output = self.linear(output)
@@ -45,6 +45,11 @@ class WeldLSTM(nn.Module):
                 # print("temp_out: ",temp_out.shape)
                 output[:start_step,:] = self.linear(temp_out)
 
+            # exits the sequence and returns the state of the filter
+            if stop_seq:
+                output = output[:start_step,:]
+                return output, state
+
             for idx, val in enumerate(src[0][start_step:]):
                 # print("val: ", val.shape)
                 val_temp = val.unsqueeze(0)
@@ -60,6 +65,4 @@ class WeldLSTM(nn.Module):
                     output[idx+start_step,:] = self.linear(out)
 
         return output
-
-            
 
