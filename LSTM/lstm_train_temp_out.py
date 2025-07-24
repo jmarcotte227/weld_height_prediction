@@ -207,7 +207,7 @@ def test(valid_dataset, nonorm_dataset):
         error_ll = trg-pred_ll
         errors_ll = errors_ll + error_ll.tolist()
 
-        if False:
+        if True:
             fig,ax = plt.subplots(1,1)
             ax.plot(trg)
             ax.plot(pred_lstm.detach())

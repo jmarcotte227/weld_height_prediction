@@ -22,15 +22,17 @@ def lstm_linearization(model, h_0, c_0, u_0):
     
     # model weights
     # TODO: needed to add '0' to the end of the variable name. not in the documentation
-    W_hi = model.lstm.weight_hh_l0[0*h_dim:1*h_dim,:]
-    W_hf = model.lstm.weight_hh_l0[1*h_dim:2*h_dim,:]
-    W_hc = model.lstm.weight_hh_l0[2*h_dim:3*h_dim,:]
-    W_ho = model.lstm.weight_hh_l0[3*h_dim:4*h_dim,:]
+    W_hi = model.lstm.weight_hh_l0[0*h_dim:1*h_dim,:].T
+    W_hf = model.lstm.weight_hh_l0[1*h_dim:2*h_dim,:].T
+    W_hc = model.lstm.weight_hh_l0[2*h_dim:3*h_dim,:].T
+    W_ho = model.lstm.weight_hh_l0[3*h_dim:4*h_dim,:].T
 
     W_ui = model.lstm.weight_ih_l0[0*h_dim:1*h_dim,:].T
     W_uf = model.lstm.weight_ih_l0[1*h_dim:2*h_dim,:].T
     W_uc = model.lstm.weight_ih_l0[2*h_dim:3*h_dim,:].T
     W_uo = model.lstm.weight_ih_l0[3*h_dim:4*h_dim,:].T
+
+    W_y = model.linear.weight
 
     # model biases
     b = model.lstm.bias_ih_l0+model.lstm.bias_hh_l0
@@ -39,21 +41,40 @@ def lstm_linearization(model, h_0, c_0, u_0):
     b_c = b[2*h_dim:3*h_dim]
     b_o = b[3*h_dim:4*h_dim]
 
-    ##### Compute B_h #####
-    f = sigmoid(W_hf.T@)
+    f = sigmoid(W_hf.T@h_0+W_uf.T@u_0+b_f)
     i = sigmoid(W_hi.T@h_0+W_ui.T@u_0+b_i)
     tc = tanh(W_hc.T@h_0+W_uc.T@u_0+b_c)
+    o = sigmoid(W_ho.T@h_0+W_uo.T@u_0+b_o)
     c = f*c_0+i*tc
 
+    ##### Compute A_h #####
+    df_dh = W_hf@sigmoid_p(W_hf.T@h_0+W_uf.T@u_0+b_f)
+    di_dh = W_hi@sigmoid_p(W_hi.T@h_0+W_ui.T@u_0+b_i)
+    dtc_dh = W_hc@tanh_p(W_hc.T@h_0+W_uc.T@u_0+b_c)
+
+    dc_dh = df_dh@diag(c_0)+di_dh@diag(tc)+dtc_dh@diag(i)
+    do_dh = dc_dh@tanh_p(c)
+
+    dtanhc_dh = dc_dh@tanh_p(c)
+
+    dh_dh = do_dh@diag(tanh(c))+dtanhc_dh@diag(o)
+    A_h = dh_dh.T
+
+    ##### Compute B_h #####
     df_du = W_uf@sigmoid_p(W_hf.T@h_0+W_uf.T@u_0+b_f)
     di_du = W_ui@sigmoid_p(W_hi.T@h_0+W_ui.T@u_0+b_i)
     dtc_du = W_uc@tanh_p(W_hc.T@h_0+W_uc.T@u_0+b_c)
 
     dc_du = df_du@diag(c_0)+di_du@diag(tc)+dtc_du@diag(i)
     do_du = dc_du@tanh_p(c)
-    A_h=0
-    B_h=0
-    C = 0
+
+    dtanhc_du = dc_du@tanh_p(c)
+
+    dh_du = do_du@diag(tanh(c))+dtanhc_du@diag(o)
+    B_h = dh_du.T
+
+
+    C = W_y
 
 
     return A_h, B_h, C
@@ -78,10 +99,10 @@ if __name__=="__main__":
     model = torch.load('../multi_output/saved_model_8_next_step.pt')
     model.eval()
 
-    src, trg = valid_dataset[2]
+    src, trg = valid_dataset[25]
 
     # warm up model with first 10 steps
-    start_seg = 10
+    start_seg = 20
     pred_lstm, state = model(torch.unsqueeze(src[:,[0,2,3]], dim=0), 
                              start_seg,
                              stop_seq = True)
@@ -89,11 +110,23 @@ if __name__=="__main__":
     # define operating point
     h_0 = torch.squeeze(state[0])
     c_0 = torch.squeeze(state[1])
-    u_0 = torch.squeeze(src[start_seg, [0,2,3]])
+    u_0 = torch.squeeze(src[start_seg-1, [0,2,3]])
+    print(src[:,0]*valid_dataset.std[0]+valid_dataset.mean[0])
 
     A_h, B_h, C = lstm_linearization(model, h_0, c_0, u_0)
 
+    dv_set = 0.5
 
+    du = torch.tensor([(dv_set)/valid_dataset.std[0], trg[start_seg-1,0]-u_0[1], trg[start_seg-1, 1]-u_0[2]])
+    
+    # linearized output
+    # TODO: make sure I don't need the A matrix. Since I'm linearizing about the previous hidden state, 
+    #       dh_k-1 goes to 0?
+    print(du)
+    print(B_h)
+    dh_k =  B_h.double()@du
+    dy = C.double()@dh_k
 
-
-
+    out_est = trg[start_seg-1,:]+dy
+    print("dy: ", dy.detach()*valid_dataset.std[[2,3]])
+    print(out_est.detach()*valid_dataset.std[[2,3]]+valid_dataset.mean[[2,3]])
