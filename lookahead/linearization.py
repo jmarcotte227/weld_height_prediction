@@ -100,91 +100,106 @@ if __name__=="__main__":
     model.eval()
 
     seq_num = 45
+    while True:
+        seq_num = int(input("Enter layer number: "))
 
-    src, trg = valid_dataset[seq_num]
-    src_nonorm, trg_nonorm = nonorm_dataset[seq_num]
+        src, trg = valid_dataset[seq_num]
+        src_nonorm, trg_nonorm = nonorm_dataset[seq_num]
 
-    h_pred = []
-    h_pred_lin = []
-    h_act = []
-    v_set = []
-    v_set_coeff = []
-    v_plan_lin = []
+        h_pred = []
+        h_pred_lin = []
+        h_act = []
+        v_set = []
+        v_set_coeff = []
+        v_plan_lin = []
 
-    # warm up model with first 10 steps
-    for start_seg in range(1,45):
-        pred_lstm, state = model(torch.unsqueeze(src[:,[0,2,3]], dim=0),
-                                 start_seg,
-                                 stop_seq = True)
+        # warm up model with first 10 steps
+        for start_seg in range(1,45):
+            pred_lstm, state = model(torch.unsqueeze(src[:,[0,2,3]], dim=0),
+                                     start_seg,
+                                     stop_seq = True)
 
-        # define operating point
-        h_0 = torch.squeeze(state[0])
-        c_0 = torch.squeeze(state[1])
-        u_0 = torch.squeeze(src[start_seg-1, [0,2,3]])
-        y_0 = pred_lstm[-1,:]
-        # y_0 = trg[start_seg-1,:]
+            # define operating point
+            h_0 = torch.squeeze(state[0])
+            c_0 = torch.squeeze(state[1])
+            u_0 = torch.squeeze(src[start_seg-1, [0,2,3]])
+            y_0 = pred_lstm[-1,:]
+            # y_0 = trg[start_seg-1,:]
 
-        A_h, B_h, C = lstm_linearization(model, h_0, c_0, u_0)
+            A_h, B_h, C = lstm_linearization(model, h_0, c_0, u_0)
 
-        # dv_set = 0.5
+            # dv_set = 0.5
 
-        # du = torch.tensor([(dv_set)/valid_dataset.std[0],
-        #                    trg[start_seg-1,0]-u_0[1],
-        #                    trg[start_seg-1, 1]-u_0[2]])
-        du = torch.tensor([src[start_seg,0]-u_0[0],
-                           trg[start_seg-1,0]-u_0[1],
-                           trg[start_seg-1, 1]-u_0[2]])
+            # du = torch.tensor([(dv_set)/valid_dataset.std[0],
+            #                    trg[start_seg-1,0]-u_0[1],
+            #                    trg[start_seg-1, 1]-u_0[2]])
+            du = torch.tensor([src[start_seg,0]-u_0[0],
+                               trg[start_seg-1,0]-u_0[1],
+                               trg[start_seg-1, 1]-u_0[2]])
 
-        # linearized output
-        # TODO: make sure I don't need the A matrix. Since I'm linearizing about the previous hidden state, 
-        #       dh_k-1 goes to 0?
-        dy = C@B_h@du
+            # linearized output
+            # TODO: make sure I don't need the A matrix. Since I'm linearizing about the previous hidden state, 
+            #       dh_k-1 goes to 0?
+            dy = C@B_h@du
 
-        out_est = y_0+dy
-        out_est_reg = out_est.detach()*valid_dataset.std[[2,3]]+valid_dataset.mean[[2,3]]
-        h_pred_lin.append(out_est_reg[1].detach())
+            out_est = y_0+dy
+            out_est_reg = out_est.detach()*valid_dataset.std[[2,3]]+valid_dataset.mean[[2,3]]
+            h_pred_lin.append(out_est_reg[1].detach())
 
-        # compute next prediction of LSTM
-        out,_ = model.lstm(torch.unsqueeze(src[start_seg, [0,2,3]], dim=0), state)
-        out = model.linear(out)
-        out = out.detach()*valid_dataset.std[[2,3]]+valid_dataset.mean[[2,3]]
-        h_pred.append(out[:,1])
-        h_act.append(trg_nonorm[start_seg,1])
+            # compute next prediction of LSTM
+            out,_ = model.lstm(torch.unsqueeze(src[start_seg, [0,2,3]], dim=0), state)
+            out = model.linear(out)
+            out = out.detach()*valid_dataset.std[[2,3]]+valid_dataset.mean[[2,3]]
+            h_pred.append(out[:,1])
+            h_act.append(trg_nonorm[start_seg,1])
 
-        v_set.append(src[start_seg, 0].detach()*valid_dataset.std[0]+valid_dataset.mean[0])
+            v_set.append(src[start_seg, 0].detach()*valid_dataset.std[0]+valid_dataset.mean[0])
 
-        v_set_coeff.append((C@B_h)[1,0].detach())
+            v_set_coeff.append((C@B_h)[1,0].detach())
 
-        dh_des = trg[start_seg,1]
+            dh_des = trg[start_seg,1]
 
-        dh_v_des = dh_des-((C@B_h)[1,1:])@src[start_seg, [2,3]]
-        dv_plan = dh_v_des/((C@B_h)[1,0])
-        v_plan = dv_plan.detach()*valid_dataset.std[0]+u_0[0]*valid_dataset.std[0]+valid_dataset.mean[0]
-        v_plan_lin.append(v_plan)
+            dh_v_des = dh_des-(((C@B_h)[1,1:])@src[start_seg, [2,3]])
+            dv_plan = dh_v_des/((C@B_h)[1,0])
+            v_plan = dv_plan.detach()*valid_dataset.std[0]+u_0[0]*valid_dataset.std[0]+valid_dataset.mean[0]
+            v_plan_lin.append(v_plan)
 
-    # print(type(h_pred))
-    fig,ax = plt.subplots(2,1, sharex = True)
-    ax[0].plot(h_act)
-    ax[0].plot(h_pred)
-    ax[0].plot(h_pred_lin)
-    fig.suptitle(f"Layer {seq_num}")
-    ax[0].legend([
-            "Measured",
-            "LSTM Prediction",
-            "Linearized LSTM Prediction"
-        ])
-    ax[0].set_ylabel("dh (mm)")
-    ax[1].plot(v_set)
-    ax[1].plot(v_plan_lin)
-    ax[1].set_ylabel("V_set (mm/s)")
-    ax[1].set_xlabel("Segment Index")
-    plt.show()
+        # print(type(h_pred))
+        fig,ax = plt.subplots(2,1, sharex = True)
+        ax[0].plot(h_act)
+        ax[0].plot(h_pred_lin)
+        ax[0].plot(h_pred)
+        fig.suptitle(f"Layer {seq_num}")
+        ax[0].legend([
+                "Measured",
+                "Linearized LSTM Prediction",
+                "LSTM Prediction",
+            ])
+        ax[0].set_ylabel("dh (mm)")
+        ax[1].plot(v_set)
+        ax[1].plot(v_plan_lin)
+        ax[1].legend(["v_set", "v_plan linear"])
+        ax[1].set_ylabel("V_set (mm/s)")
+        ax[1].set_xlabel("Segment Index")
+        plt.show()
 
-    fig,ax = plt.subplots()
-    fig.suptitle("v_set Coefficient")
-    ax.plot(v_set_coeff)
-    ax.set_ylabel("Coefficient Value")
-    ax.set_xlabel("Prediction Step")
-    plt.show()
-    # print("dy: ", dy.detach()*valid_dataset.std[[2,3]])
-    # print(out_est.detach()*valid_dataset.std[[2,3]]+valid_dataset.mean[[2,3]])
+        # v prediction
+        # fig, ax = plt.subplots()
+        # ax.set_title(f"Layer {seq_num} Velocity Calculation")
+        # ax[1].set_ylabel("V_set (mm/s)")
+        # ax[1].set_xlabel("Segment Index")
+        # ax.plot(v_set)
+        # ax.plot(v_plan_lin)
+        # ax.legend([
+        #     "v_set actual",
+        #     "v_set linear prediction"
+        #     ])
+
+        fig,ax = plt.subplots()
+        fig.suptitle("v_set Coefficient")
+        ax.plot(v_set_coeff)
+        ax.set_ylabel("Coefficient Value")
+        ax.set_xlabel("Prediction Step")
+        plt.show()
+        # print("dy: ", dy.detach()*valid_dataset.std[[2,3]])
+        # print(out_est.detach()*valid_dataset.std[[2,3]]+valid_dataset.mean[[2,3]])
