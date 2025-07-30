@@ -7,7 +7,7 @@ class WeldLSTM(nn.Module):
                  hidden_size = 1024,
                  output_size = 1,
                  num_layers = 1,
-                 dropout = 0
+dropout = 0
                  ):
         super().__init__()
         self.input_size = input_size
@@ -22,10 +22,16 @@ class WeldLSTM(nn.Module):
         self.linear = nn.Linear(in_features=hidden_size,
                                 out_features=output_size)
 
-    def forward(self, src, start_step = 0, stop_seq = False):
+    def forward(self, src, start_step = 0, stop_seq = False, hidden_state = None):
         if self.training:
             output, state = self.lstm(src)
             output = self.linear(output)
+
+        elif hidden_state is not None:
+            output, state = self.lstm(src, hidden_state)
+            output = self.linear(output)
+
+            return output, state
 
         else:
             # should be testing

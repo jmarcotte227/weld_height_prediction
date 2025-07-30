@@ -76,7 +76,6 @@ def lstm_linearization(model, h_0, c_0, u_0):
 
     C = W_y
 
-
     return A_h, B_h, C
 
 if __name__=="__main__":
@@ -122,9 +121,10 @@ if __name__=="__main__":
             # define operating point
             h_0 = torch.squeeze(state[0])
             c_0 = torch.squeeze(state[1])
-            u_0 = torch.squeeze(src[start_seg-1, [0,2,3]])
-            y_0 = pred_lstm[-1,:]
-            # y_0 = trg[start_seg-1,:]
+            u_0 = torch.squeeze(src[start_seg, [0,2,3]])
+            u_0[0] = src[start_seg-1,0]
+            y_0 = torch.squeeze(model(torch.unsqueeze(u_0, dim=0), 
+                                hidden_state=state))
 
             A_h, B_h, C = lstm_linearization(model, h_0, c_0, u_0)
 
@@ -141,6 +141,7 @@ if __name__=="__main__":
             # TODO: make sure I don't need the A matrix. Since I'm linearizing about the previous hidden state, 
             #       dh_k-1 goes to 0?
             dy = C@B_h@du
+            print(dy.shape)
 
             out_est = y_0+dy
             out_est_reg = out_est.detach()*valid_dataset.std[[2,3]]+valid_dataset.mean[[2,3]]
@@ -165,23 +166,23 @@ if __name__=="__main__":
             v_plan_lin.append(v_plan)
 
         # print(type(h_pred))
-        fig,ax = plt.subplots(2,1, sharex = True)
-        ax[0].plot(h_act)
-        ax[0].plot(h_pred_lin)
-        ax[0].plot(h_pred)
-        fig.suptitle(f"Layer {seq_num}")
-        ax[0].legend([
-                "Measured",
-                "Linearized LSTM Prediction",
-                "LSTM Prediction",
-            ])
-        ax[0].set_ylabel("dh (mm)")
-        ax[1].plot(v_set)
-        ax[1].plot(v_plan_lin)
-        ax[1].legend(["v_set", "v_plan linear"])
-        ax[1].set_ylabel("V_set (mm/s)")
-        ax[1].set_xlabel("Segment Index")
-        plt.show()
+        # fig,ax = plt.subplots(2,1, sharex = True)
+        # ax[0].plot(h_act)
+        # ax[0].plot(h_pred_lin)
+        # ax[0].plot(h_pred)
+        # fig.suptitle(f"Layer {seq_num}")
+        # ax[0].legend([
+        #         "Measured",
+        #         "Linearized LSTM Prediction",
+        #         "LSTM Prediction",
+        #     ])
+        # ax[0].set_ylabel("dh (mm)")
+        # ax[1].plot(v_set)
+        # ax[1].plot(v_plan_lin)
+        # ax[1].legend(["v_set", "v_plan linear"])
+        # ax[1].set_ylabel("V_set (mm/s)")
+        # ax[1].set_xlabel("Segment Index")
+        # plt.show()
 
         # v prediction
         # fig, ax = plt.subplots()
@@ -195,11 +196,11 @@ if __name__=="__main__":
         #     "v_set linear prediction"
         #     ])
 
-        fig,ax = plt.subplots()
-        fig.suptitle("v_set Coefficient")
-        ax.plot(v_set_coeff)
-        ax.set_ylabel("Coefficient Value")
-        ax.set_xlabel("Prediction Step")
-        plt.show()
+        # fig,ax = plt.subplots()
+        # fig.suptitle("v_set Coefficient")
+        # ax.plot(v_set_coeff)
+        # ax.set_ylabel("Coefficient Value")
+        # ax.set_xlabel("Prediction Step")
+        # plt.show()
         # print("dy: ", dy.detach()*valid_dataset.std[[2,3]])
         # print(out_est.detach()*valid_dataset.std[[2,3]]+valid_dataset.mean[[2,3]])
