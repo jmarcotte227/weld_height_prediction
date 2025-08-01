@@ -67,12 +67,15 @@ def lstm_linearization(model, h_0, c_0, u_0):
     dtc_du = W_uc@tanh_p(W_hc.T@h_0+W_uc.T@u_0+b_c)
 
     dc_du = df_du@diag(c_0)+di_du@diag(tc)+dtc_du@diag(i)
-    do_du = dc_du@tanh_p(c)
+    do_du = W_uo@sigmoid_p(W_ho.T@h_0+W_uo.T@u_0+b_o)
 
     dtanhc_du = dc_du@tanh_p(c)
 
     dh_du = do_du@diag(tanh(c))+dtanhc_du@diag(o)
     B_h = dh_du.T
+    # print("Separated: ", B_h)
+    # B_h = (W_uo@sigmoid_p(W_ho.T@h_0+W_uo.T@u_0+b_o)@diag(tanh(c))+(W_uf@sigmoid_p(W_hf.T@h_0+W_uf.T@u_0+b_f)@diag(c_0)+W_ui@sigmoid_p(W_hi.T@h_0+W_ui.T@u_0+b_i)@diag(tc)+W_uc@tanh_p(W_hc.T@h_0+W_uc.T@u_0+b_c)@diag(i))@tanh_p(c)@diag(o)).T
+    # print("Together: ", B_h)
 
     C = W_y
 
@@ -123,8 +126,9 @@ if __name__=="__main__":
             c_0 = torch.squeeze(state[1])
             u_0 = torch.squeeze(src[start_seg, [0,2,3]])
             u_0[0] = src[start_seg-1,0]
-            y_0 = torch.squeeze(model(torch.unsqueeze(u_0, dim=0), 
-                                hidden_state=state))
+            y_0, _ = model(torch.unsqueeze(u_0, dim=0), 
+                                hidden_state=state)
+            y_0 = torch.squeeze(y_0)
 
             A_h, B_h, C = lstm_linearization(model, h_0, c_0, u_0)
 
@@ -165,42 +169,42 @@ if __name__=="__main__":
             v_plan = dv_plan.detach()*valid_dataset.std[0]+u_0[0]*valid_dataset.std[0]+valid_dataset.mean[0]
             v_plan_lin.append(v_plan)
 
-        # print(type(h_pred))
-        # fig,ax = plt.subplots(2,1, sharex = True)
-        # ax[0].plot(h_act)
-        # ax[0].plot(h_pred_lin)
-        # ax[0].plot(h_pred)
-        # fig.suptitle(f"Layer {seq_num}")
-        # ax[0].legend([
-        #         "Measured",
-        #         "Linearized LSTM Prediction",
-        #         "LSTM Prediction",
-        #     ])
-        # ax[0].set_ylabel("dh (mm)")
-        # ax[1].plot(v_set)
-        # ax[1].plot(v_plan_lin)
-        # ax[1].legend(["v_set", "v_plan linear"])
-        # ax[1].set_ylabel("V_set (mm/s)")
-        # ax[1].set_xlabel("Segment Index")
-        # plt.show()
+        print(type(h_pred))
+        fig,ax = plt.subplots(2,1, sharex = True)
+        ax[0].plot(h_act)
+        ax[0].plot(h_pred_lin)
+        ax[0].plot(h_pred)
+        fig.suptitle(f"Layer {seq_num}")
+        ax[0].legend([
+                "Measured",
+                "Linearized LSTM Prediction",
+                "LSTM Prediction",
+            ])
+        ax[0].set_ylabel("dh (mm)")
+        ax[1].plot(v_set)
+        ax[1].plot(v_plan_lin)
+        ax[1].legend(["v_set", "v_plan linear"])
+        ax[1].set_ylabel("V_set (mm/s)")
+        ax[1].set_xlabel("Segment Index")
+        plt.show()
 
         # v prediction
-        # fig, ax = plt.subplots()
-        # ax.set_title(f"Layer {seq_num} Velocity Calculation")
-        # ax[1].set_ylabel("V_set (mm/s)")
-        # ax[1].set_xlabel("Segment Index")
-        # ax.plot(v_set)
-        # ax.plot(v_plan_lin)
-        # ax.legend([
-        #     "v_set actual",
-        #     "v_set linear prediction"
-        #     ])
+        fig, ax = plt.subplots()
+        ax.set_title(f"Layer {seq_num} Velocity Calculation")
+        ax[1].set_ylabel("V_set (mm/s)")
+        ax[1].set_xlabel("Segment Index")
+        ax.plot(v_set)
+        ax.plot(v_plan_lin)
+        ax.legend([
+            "v_set actual",
+            "v_set linear prediction"
+            ])
 
-        # fig,ax = plt.subplots()
-        # fig.suptitle("v_set Coefficient")
-        # ax.plot(v_set_coeff)
-        # ax.set_ylabel("Coefficient Value")
-        # ax.set_xlabel("Prediction Step")
-        # plt.show()
-        # print("dy: ", dy.detach()*valid_dataset.std[[2,3]])
-        # print(out_est.detach()*valid_dataset.std[[2,3]]+valid_dataset.mean[[2,3]])
+        fig,ax = plt.subplots()
+        fig.suptitle("v_set Coefficient")
+        ax.plot(v_set_coeff)
+        ax.set_ylabel("Coefficient Value")
+        ax.set_xlabel("Prediction Step")
+        plt.show()
+        print("dy: ", dy.detach()*valid_dataset.std[[2,3]])
+        print(out_est.detach()*valid_dataset.std[[2,3]]+valid_dataset.mean[[2,3]])
