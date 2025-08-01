@@ -17,8 +17,12 @@ if __name__=='__main__':
     HID_DIM = 8
     HEIGHT_REF = 1.2
     dh_nom =    1.5
-    dh_max =    1.859
-    dh_min =    1.486
+    dh_max =    1.86
+    dh_min =    1.0
+
+    v_min = 3.0
+    v_max = 17.0
+
     i = 0
 
     cos_dh = (dh_min-dh_max)/2*np.cos(2*np.pi/(MAX_IDX-1)*np.arange(0,MAX_IDX))+(dh_max+dh_min)/2
@@ -46,6 +50,10 @@ if __name__=='__main__':
     dh = []
     dh_est = []
     idxs = np.linspace(1,MAX_IDX,MAX_IDX)
+
+    # convert limits
+    v_min = torch.tensor([(v_min-train_dataset.mean[0])/train_dataset.std[0]], dtype=torch.float32)
+    v_max = torch.tensor([(v_max-train_dataset.mean[0])/train_dataset.std[0]], dtype=torch.float32)
     
     while i<MAX_IDX:
         # calculate linearization
@@ -99,6 +107,8 @@ if __name__=='__main__':
         y_d = torch.unsqueeze(setpoint[i], dim=0)
 
         u_cmd = (y_d-y_0[1])/(C@B)+u_0[0]
+        # project into valid region
+        u_cmd = min(max(u_cmd, v_min) , v_max)
         x = torch.unsqueeze(torch.tensor([u_cmd, T_prev, dh_prev]),dim=0)
         y_out, state = model(x, hidden_state=state)
 
