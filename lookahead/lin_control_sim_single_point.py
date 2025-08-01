@@ -13,15 +13,22 @@ from lstm_train_next_step import WeldDataset
 
 
 if __name__=='__main__':
-    MAX_IDX = 50
+    MAX_IDX = 46
     HID_DIM = 8
     HEIGHT_REF = 1.2
+    dh_nom =    1.5
+    dh_max =    1.859
+    dh_min =    1.486
     i = 0
+
+    cos_dh = (dh_min-dh_max)/2*np.cos(2*np.pi/(MAX_IDX-1)*np.arange(0,MAX_IDX))+(dh_max+dh_min)/2
+
     # load data for mean
     TRAIN_DATA_DIR = '../data/lstm_processed/CL_cold.npy'
     train_dataset = WeldDataset(TRAIN_DATA_DIR)
 
-    setpoint = ((torch.ones(MAX_IDX)*HEIGHT_REF)-train_dataset.mean[3])/train_dataset.std[3]
+    # setpoint = ((torch.ones(MAX_IDX)*HEIGHT_REF)-train_dataset.mean[3])/train_dataset.std[3]
+    setpoint = ((torch.tensor(cos_dh,dtype=torch.float32))-train_dataset.mean[3])/train_dataset.std[3]
 
     # load model
     model = torch.load('../multi_output/saved_model_8_next_step.pt')
@@ -39,7 +46,6 @@ if __name__=='__main__':
     dh = []
     dh_est = []
     idxs = np.linspace(1,MAX_IDX,MAX_IDX)
-    print(idxs)
     
     while i<MAX_IDX:
         # calculate linearization

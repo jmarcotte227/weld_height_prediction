@@ -31,7 +31,7 @@ if __name__=='__main__':
     THRESHOLD = 0.01
 
     dh_nom =    1.5
-    dh_max =    1.859
+    dh_max =    2.0
     dh_min =    1.486
 
     # load model
