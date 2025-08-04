@@ -15,10 +15,10 @@ from lstm_train_next_step import WeldDataset
 if __name__=='__main__':
     MAX_IDX = 46
     HID_DIM = 8
-    HEIGHT_REF = 1.2
+    HEIGHT_REF = 1.5
     dh_nom =    1.5
     dh_max =    1.86
-    dh_min =    1.0
+    dh_min =    1.30
 
     v_min = 3.0
     v_max = 17.0
@@ -76,31 +76,31 @@ if __name__=='__main__':
         C = C[1,:]
 
         # if i ==40:
-        # if i > 1:
-        #     # look at how changing velocity input effects the linearization
-        #     # and actual model output.
-        #     length = 20
-        #     fig,ax = plt.subplots()
+        if i > 1:
+            # look at how changing velocity input effects the linearization
+            # and actual model output.
+            length = 20
+            fig,ax = plt.subplots()
 
-        #     u_cmd_reg = np.linspace(3.0,17.0,length)
-        #     u_cmd = (u_cmd_reg-train_dataset.mean[0])/train_dataset.std[0]
-        #     # print(y_0[1], u_0[0])
-        #     dhs_lin = (u_cmd-u_prev.detach().numpy())*(C@B).detach().numpy()+y_0[1].detach().numpy()
-        #     dhs_lin = (dhs_lin*train_dataset.std[3])+train_dataset.mean[3]
-        #     ax.plot(u_cmd_reg, dhs_lin)
+            u_cmd_reg = np.linspace(3.0,17.0,length)
+            u_cmd = (u_cmd_reg-train_dataset.mean[0])/train_dataset.std[0]
+            # print(y_0[1], u_0[0])
+            dhs_lin = (u_cmd-u_prev.detach().numpy())*(C@B).detach().numpy()+y_0[1].detach().numpy()
+            dhs_lin = (dhs_lin*train_dataset.std[3])+train_dataset.mean[3]
+            ax.plot(u_cmd_reg, dhs_lin)
 
-        #     # try different u's in model
-        #     dhs_mod = np.zeros(length)
-        #     for idx, u in enumerate(u_cmd):
-        #         y, _ = model(torch.unsqueeze(torch.tensor([u, T_prev, dh_prev], dtype=torch.float32), dim=0), hidden_state = state)
-        #         dhs_mod[idx] = y[:,-1].detach()
+            # try different u's in model
+            dhs_mod = np.zeros(length)
+            for idx, u in enumerate(u_cmd):
+                y, _ = model(torch.unsqueeze(torch.tensor([u, T_prev, dh_prev], dtype=torch.float32), dim=0), hidden_state = state)
+                dhs_mod[idx] = y[:,-1].detach()
 
-        #     dhs_mod = (dhs_mod*train_dataset.std[3])+train_dataset.mean[3]
-        #     ax.plot(u_cmd_reg, dhs_mod)
-        #     ax.scatter(u_prev.detach()*train_dataset.std[0]+train_dataset.mean[0], dh_prev.detach()*train_dataset.std[3]+train_dataset.mean[3])
-        #     # ax.set_ylim([0,2.5])
+            dhs_mod = (dhs_mod*train_dataset.std[3])+train_dataset.mean[3]
+            ax.plot(u_cmd_reg, dhs_mod)
+            # ax.scatter(u_prev.detach()*train_dataset.std[0]+train_dataset.mean[0], dh_prev.detach()*train_dataset.std[3]+train_dataset.mean[3])
+            ax.set_ylim([0,3])
 
-        #     plt.show()
+            plt.show()
 
 
         # generate velocity profile according to optimization
@@ -132,8 +132,11 @@ if __name__=='__main__':
 
     fig,ax = plt.subplots(2,1, sharex = True)
     ax[0].plot(dh)
+    ax[0].set_ylabel("dh (mm)")
     # ax[0].scatter(idxs, dh_est)
     ax[1].plot(u_cmds)
+    ax[1].set_ylabel("V_set (mm/s)")
+    ax[1].set_xlabel("Segment Index")
     plt.show()
 
 

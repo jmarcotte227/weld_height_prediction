@@ -102,6 +102,11 @@ if __name__=="__main__":
     model.eval()
 
     seq_num = 45
+    v_min = 3.0
+    v_max = 17.0
+    # convert limits
+    v_min = torch.tensor([(v_min-train_dataset.mean[0])/train_dataset.std[0]], dtype=torch.float32)
+    v_max = torch.tensor([(v_max-train_dataset.mean[0])/train_dataset.std[0]], dtype=torch.float32)
     while True:
         seq_num = int(input("Enter layer number: "))
 
@@ -149,6 +154,7 @@ if __name__=="__main__":
 
             out_est = y_0+dy
             out_est_reg = out_est.detach()*valid_dataset.std[[2,3]]+valid_dataset.mean[[2,3]]
+            print(out_est_reg)
             h_pred_lin.append(out_est_reg[1].detach())
 
             # compute next prediction of LSTM
@@ -164,10 +170,18 @@ if __name__=="__main__":
 
             dh_des = trg[start_seg,1]
 
-            dh_v_des = dh_des-(((C@B_h)[1,1:])@src[start_seg, [2,3]])
-            dv_plan = dh_v_des/((C@B_h)[1,0])
-            v_plan = dv_plan.detach()*valid_dataset.std[0]+u_0[0]*valid_dataset.std[0]+valid_dataset.mean[0]
-            v_plan_lin.append(v_plan)
+            
+            # isolate the effect of the velocity on the height input
+            B_h = B_h[:,0]
+            C = C[1,:]
+            print(B_h.shape)
+            print(C.shape)
+
+            v_plan = (dh_des-y_0[1])/(C@B_h)+u_0[0]
+            print(v_plan.shape)
+            v_plan = min(max(v_plan, v_min), v_max)
+            print(v_plan)
+            v_plan_lin.append(v_plan.detach()*valid_dataset.std[0]+valid_dataset.mean[0])
 
         print(type(h_pred))
         fig,ax = plt.subplots(2,1, sharex = True)
@@ -191,8 +205,8 @@ if __name__=="__main__":
         # v prediction
         fig, ax = plt.subplots()
         ax.set_title(f"Layer {seq_num} Velocity Calculation")
-        ax[1].set_ylabel("V_set (mm/s)")
-        ax[1].set_xlabel("Segment Index")
+        ax.set_ylabel("V_set (mm/s)")
+        ax.set_xlabel("Segment Index")
         ax.plot(v_set)
         ax.plot(v_plan_lin)
         ax.legend([
