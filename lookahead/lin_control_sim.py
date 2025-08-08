@@ -5,6 +5,8 @@ from torch.linalg import pinv
 from torch import tanh, sigmoid, diag, square
 import matplotlib.pyplot as plt
 
+import time
+
 # load internal packages
 from linearization import lstm_linearization, tanh_p, sigmoid_p
 sys.path.append("../multi_output/")
@@ -56,8 +58,12 @@ if __name__=='__main__':
     # convert limits
     v_min = torch.tensor([(v_min-train_dataset.mean[0])/train_dataset.std[0]], dtype=torch.float32)
     v_max = torch.tensor([(v_max-train_dataset.mean[0])/train_dataset.std[0]], dtype=torch.float32)
+
+    # timing
+    times = []
     
     while i<MAX_IDX:
+        start = time.perf_counter()
         # calculate linearization
         h_0 = torch.squeeze(state[0])
         c_0 = torch.squeeze(state[1])
@@ -116,12 +122,14 @@ if __name__=='__main__':
 
         # update prev variables
         u_prev = u_cmd
+        end = time.perf_counter()
         T_prev = torch.squeeze(y_out)[0]+(torch.rand(1)-0.5)*NOISE_MAG
         dh_prev = torch.squeeze(y_out)[1]+(torch.rand(1)-0.5)*NOISE_MAG
 
         # save relevant outputs
         u_cmds.append(u_cmd.detach())
         dh.append(dh_prev.detach())
+        times.append(end-start)
 
         i+=1
     
@@ -146,6 +154,9 @@ if __name__=='__main__':
     ax[1].set_ylabel("V_set (mm/s)")
     ax[1].set_xlabel("Segment Index")
     plt.show()
+
+    print(f"Runtime Specs:    Mean: {np.mean(times)}    Std: {np.std(times)}")
+    print(f"                  Max:  {np.max(times)}     Min: {np.min(times)}")
 
 
 
