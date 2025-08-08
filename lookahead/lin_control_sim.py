@@ -16,12 +16,14 @@ if __name__=='__main__':
     MAX_IDX = 46
     HID_DIM = 8
     HEIGHT_REF = 1.5
+    NOISE_MAG = 0.1
     dh_nom =    1.5
     dh_max =    1.86
     dh_min =    1.30
 
     v_min = 3.0
     v_max = 17.0
+
 
     i = 0
 
@@ -76,7 +78,7 @@ if __name__=='__main__':
         C = C[1,:]
 
         # if i ==40:
-        if i > 1:
+        if False:
             # look at how changing velocity input effects the linearization
             # and actual model output.
             length = 20
@@ -100,7 +102,7 @@ if __name__=='__main__':
             # ax.scatter(u_prev.detach()*train_dataset.std[0]+train_dataset.mean[0], dh_prev.detach()*train_dataset.std[3]+train_dataset.mean[3])
             ax.set_ylim([0,3])
 
-            plt.show()
+            # plt.show()
 
 
         # generate velocity profile according to optimization
@@ -114,8 +116,8 @@ if __name__=='__main__':
 
         # update prev variables
         u_prev = u_cmd
-        T_prev = torch.squeeze(y_out)[0]
-        dh_prev = torch.squeeze(y_out)[1]
+        T_prev = torch.squeeze(y_out)[0]+(torch.rand(1)-0.5)*NOISE_MAG
+        dh_prev = torch.squeeze(y_out)[1]+(torch.rand(1)-0.5)*NOISE_MAG
 
         # save relevant outputs
         u_cmds.append(u_cmd.detach())
@@ -132,7 +134,13 @@ if __name__=='__main__':
 
     fig,ax = plt.subplots(2,1, sharex = True)
     ax[0].plot(dh)
+    ax[0].plot(cos_dh, 'r--')
     ax[0].set_ylabel("dh (mm)")
+    ax[0].legend([
+        'dh measured',
+        'reference'
+    ])
+    fig.suptitle("Simulated Linearization-Based Control")
     # ax[0].scatter(idxs, dh_est)
     ax[1].plot(u_cmds)
     ax[1].set_ylabel("V_set (mm/s)")
