@@ -49,17 +49,18 @@ def lstm_linearization(model, h_0, c_0, u_0):
     c = f*c_0+i*tc
 
     ##### Compute A_h #####
-    df_dh = W_hf@sigmoid_p(W_hf.T@h_0+W_uf.T@u_0+b_f)
-    di_dh = W_hi@sigmoid_p(W_hi.T@h_0+W_ui.T@u_0+b_i)
-    dtc_dh = W_hc@tanh_p(W_hc.T@h_0+W_uc.T@u_0+b_c)
+    # df_dh = W_hf@sigmoid_p(W_hf.T@h_0+W_uf.T@u_0+b_f)
+    # di_dh = W_hi@sigmoid_p(W_hi.T@h_0+W_ui.T@u_0+b_i)
+    # dtc_dh = W_hc@tanh_p(W_hc.T@h_0+W_uc.T@u_0+b_c)
 
-    dc_dh = df_dh@diag(c_0)+di_dh@diag(tc)+dtc_dh@diag(i)
-    do_dh = dc_dh@tanh_p(c)
+    # dc_dh = df_dh@diag(c_0)+di_dh@diag(tc)+dtc_dh@diag(i)
+    # do_dh = dc_dh@tanh_p(c)
 
-    dtanhc_dh = dc_dh@tanh_p(c)
+    # dtanhc_dh = dc_dh@tanh_p(c)
 
-    dh_dh = do_dh@diag(tanh(c))+dtanhc_dh@diag(o)
-    A_h = dh_dh.T
+    # dh_dh = do_dh@diag(tanh(c))+dtanhc_dh@diag(o)
+    # A_h = dh_dh.T
+    A_h = None
 
     ##### Compute B_h #####
     df_du = W_uf@sigmoid_p(W_hf.T@h_0+W_uf.T@u_0+b_f)

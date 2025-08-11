@@ -35,8 +35,8 @@ if __name__=='__main__':
     TRAIN_DATA_DIR = '../data/lstm_processed/CL_cold.npy'
     train_dataset = WeldDataset(TRAIN_DATA_DIR)
 
-    # setpoint = ((torch.ones(MAX_IDX)*HEIGHT_REF)-train_dataset.mean[3])/train_dataset.std[3]
-    setpoint = ((torch.tensor(cos_dh,dtype=torch.float32))-train_dataset.mean[3])/train_dataset.std[3]
+    setpoint = ((torch.ones(MAX_IDX)*HEIGHT_REF)-train_dataset.mean[3])/train_dataset.std[3]
+    # setpoint = ((torch.tensor(cos_dh,dtype=torch.float32))-train_dataset.mean[3])/train_dataset.std[3]
 
     # load model
     model = torch.load('../multi_output/saved_model_8_next_step.pt')
