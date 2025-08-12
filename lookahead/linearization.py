@@ -62,18 +62,36 @@ def lstm_linearization(model, h_0, c_0, u_0):
     # A_h = dh_dh.T
     A_h = None
 
-    ##### Compute B_h #####
-    df_du = W_uf@sigmoid_p(W_hf.T@h_0+W_uf.T@u_0+b_f)
-    di_du = W_ui@sigmoid_p(W_hi.T@h_0+W_ui.T@u_0+b_i)
-    dtc_du = W_uc@tanh_p(W_hc.T@h_0+W_uc.T@u_0+b_c)
+    # ##### Compute B_h #####
+    # df_du = W_uf@sigmoid_p(W_hf.T@h_0+W_uf.T@u_0+b_f)
+    # di_du = W_ui@sigmoid_p(W_hi.T@h_0+W_ui.T@u_0+b_i)
+    # dtc_du = W_uc@tanh_p(W_hc.T@h_0+W_uc.T@u_0+b_c)
 
-    dc_du = df_du@diag(c_0)+di_du@diag(tc)+dtc_du@diag(i)
-    do_du = W_uo@sigmoid_p(W_ho.T@h_0+W_uo.T@u_0+b_o)
+    # dc_du = df_du@diag(c_0)+di_du@diag(tc)+dtc_du@diag(i)
+    # do_du = W_uo@sigmoid_p(W_ho.T@h_0+W_uo.T@u_0+b_o)
 
-    dtanhc_du = dc_du@tanh_p(c)
+    # dtanhc_du = dc_du@tanh_p(c)
 
-    dh_du = do_du@diag(tanh(c))+dtanhc_du@diag(o)
+    # dh_du = do_du@diag(tanh(c))+dtanhc_du@diag(o)
+    # B_h = dh_du.T
+
+    ##### Compute B_h fast #####
+    # df_du = W_uf@sigmoid_p(W_hf.T@h_0+W_uf.T@u_0+b_f)
+    # di_du = W_ui@sigmoid_p(W_hi.T@h_0+W_ui.T@u_0+b_i)
+    # dtc_du = W_uc@tanh_p(W_hc.T@h_0+W_uc.T@u_0+b_c)
+
+    # dc_du = df_du@diag(c_0)+di_du@diag(tc)+dtc_du@diag(i)
+    # do_du = W_uo@sigmoid_p(W_ho.T@h_0+W_uo.T@u_0+b_o)
+
+    # dtanhc_du = dc_du@tanh_p(c)
+
+    # dh_du = do_du@diag(tanh(c))+dtanhc_du@diag(o)
+    # B_h = dh_du.T
+
+    ##### Compute B_h one line #####
+    dh_du = (W_uo@sigmoid_p(W_ho.T@h_0+W_uo.T@u_0+b_o))@diag(tanh(c))+(((W_uf@sigmoid_p(W_hf.T@h_0+W_uf.T@u_0+b_f))@diag(c_0)+(W_ui@sigmoid_p(W_hi.T@h_0+W_ui.T@u_0+b_i))@diag(tc)+(W_uc@tanh_p(W_hc.T@h_0+W_uc.T@u_0+b_c))@diag(i))@tanh_p(c))@diag(o)
     B_h = dh_du.T
+
     # print("Separated: ", B_h)
     # B_h = (W_uo@sigmoid_p(W_ho.T@h_0+W_uo.T@u_0+b_o)@diag(tanh(c))+(W_uf@sigmoid_p(W_hf.T@h_0+W_uf.T@u_0+b_f)@diag(c_0)+W_ui@sigmoid_p(W_hi.T@h_0+W_ui.T@u_0+b_i)@diag(tc)+W_uc@tanh_p(W_hc.T@h_0+W_uc.T@u_0+b_c)@diag(i))@tanh_p(c)@diag(o)).T
     # print("Together: ", B_h)

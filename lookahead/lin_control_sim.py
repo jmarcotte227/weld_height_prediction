@@ -4,13 +4,14 @@ import numpy as np
 from torch.linalg import pinv
 from torch import tanh, sigmoid, diag, square
 import matplotlib.pyplot as plt
+# from qp_solvers import solve_qp
 
 import time
 
 # load internal packages
 from linearization import lstm_linearization, tanh_p, sigmoid_p
 sys.path.append("../multi_output/")
-from lstm_model_next_step import WeldLSTM
+from lstm_model_next_step_fast import WeldLSTM
 from lstm_train_next_step import WeldDataset
 
 
@@ -61,17 +62,22 @@ if __name__=='__main__':
 
     # timing
     times = []
+
+    # start model
+    y_0, _ = model(torch.unsqueeze(torch.zeros(3), dim=0),
+                   hidden_state = state)
     
     while i<MAX_IDX:
-        start = time.perf_counter()
         # calculate linearization
         h_0 = torch.squeeze(state[0])
         c_0 = torch.squeeze(state[1])
         u_0 = torch.tensor([u_prev, T_prev, dh_prev])
 
         # not sure if h_0 or c_0 is correct here
+        start = time.perf_counter()
         y_0, _ = model(torch.unsqueeze(u_0, dim=0), 
                             hidden_state=state)
+        end = time.perf_counter()
         # h_0 = torch.squeeze(h_0)
         # c_0 = torch.squeeze(c_0)
 
@@ -122,7 +128,6 @@ if __name__=='__main__':
 
         # update prev variables
         u_prev = u_cmd
-        end = time.perf_counter()
         T_prev = torch.squeeze(y_out)[0]+(torch.rand(1)-0.5)*NOISE_MAG
         dh_prev = torch.squeeze(y_out)[1]+(torch.rand(1)-0.5)*NOISE_MAG
 
@@ -157,6 +162,9 @@ if __name__=='__main__':
 
     print(f"Runtime Specs:    Mean: {np.mean(times)}    Std: {np.std(times)}")
     print(f"                  Max:  {np.max(times)}     Min: {np.min(times)}")
+
+    plt.plot(times)
+    plt.show()
 
 
 
