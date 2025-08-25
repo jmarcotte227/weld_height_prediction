@@ -32,20 +32,26 @@ if __name__=='__main__':
 
     cos_dh = (dh_min-dh_max)/2*np.cos(2*np.pi/(MAX_IDX-1)*np.arange(0,MAX_IDX))+(dh_max+dh_min)/2
 
+    # check device type for torch
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
     # load data for mean
     TRAIN_DATA_DIR = '../data/lstm_processed/CL_cold.npy'
     train_dataset = WeldDataset(TRAIN_DATA_DIR)
 
     setpoint = ((torch.ones(MAX_IDX)*HEIGHT_REF)-train_dataset.mean[3])/train_dataset.std[3]
     # setpoint = ((torch.tensor(cos_dh,dtype=torch.float32))-train_dataset.mean[3])/train_dataset.std[3]
+    setpoint = setpoint.to(device)
+    print(setpoint.device)
 
     # load model
     model = torch.load('../multi_output/saved_model_8_next_step.pt')
+    model.to(device)
     model.eval()
 
     # initialize hidden state
-    h = torch.zeros(1,HID_DIM)
-    c = torch.zeros(1,HID_DIM)
+    h = torch.zeros(1,HID_DIM, device = device)
+    c = torch.zeros(1,HID_DIM, device = device)
     state = (h,c)
     u_prev = 0.0
     T_prev = 0.0
@@ -57,21 +63,21 @@ if __name__=='__main__':
     idxs = np.linspace(1,MAX_IDX,MAX_IDX)
 
     # convert limits
-    v_min = torch.tensor([(v_min-train_dataset.mean[0])/train_dataset.std[0]], dtype=torch.float32)
-    v_max = torch.tensor([(v_max-train_dataset.mean[0])/train_dataset.std[0]], dtype=torch.float32)
+    v_min = torch.tensor([(v_min-train_dataset.mean[0])/train_dataset.std[0]], dtype=torch.float32, device=device)
+    v_max = torch.tensor([(v_max-train_dataset.mean[0])/train_dataset.std[0]], dtype=torch.float32, device=device)
 
     # timing
     times = []
 
     # start model
-    y_0, _ = model(torch.unsqueeze(torch.zeros(3), dim=0),
+    y_0, _ = model(torch.unsqueeze(torch.zeros(3, device = device), dim=0),
                    hidden_state = state)
     
     while i<MAX_IDX:
         # calculate linearization
         h_0 = torch.squeeze(state[0])
         c_0 = torch.squeeze(state[1])
-        u_0 = torch.tensor([u_prev, T_prev, dh_prev])
+        u_0 = torch.tensor([u_prev, T_prev, dh_prev], device = device)
 
         # not sure if h_0 or c_0 is correct here
         start = time.perf_counter()
@@ -88,6 +94,7 @@ if __name__=='__main__':
         # isolate the effect of the velocity on the height input
         B = B[:,0]
         C = C[1,:]
+        print(C.device)
 
         # if i ==40:
         if False:
@@ -119,21 +126,24 @@ if __name__=='__main__':
 
         # generate velocity profile according to optimization
         y_d = torch.unsqueeze(setpoint[i], dim=0)
+        print("yd: ", y_d.device)
+        print("y_0: ", y_0.device)
+        print("u_0: ", u_0.device)
 
         u_cmd = (y_d-y_0[1])/(C@B)+u_0[0]
         # project into valid region
         u_cmd = min(max(u_cmd, v_min) , v_max)
-        x = torch.unsqueeze(torch.tensor([u_cmd, T_prev, dh_prev]),dim=0)
+        x = torch.unsqueeze(torch.tensor([u_cmd, T_prev, dh_prev], device=device),dim=0)
         y_out, state = model(x, hidden_state=state)
 
         # update prev variables
         u_prev = u_cmd
-        T_prev = torch.squeeze(y_out)[0]+(torch.rand(1)-0.5)*NOISE_MAG
-        dh_prev = torch.squeeze(y_out)[1]+(torch.rand(1)-0.5)*NOISE_MAG
+        T_prev = torch.squeeze(y_out)[0]+(torch.rand(1, device=device)-0.5)*NOISE_MAG
+        dh_prev = torch.squeeze(y_out)[1]+(torch.rand(1, device=device)-0.5)*NOISE_MAG
 
         # save relevant outputs
-        u_cmds.append(u_cmd.detach())
-        dh.append(dh_prev.detach())
+        u_cmds.append(u_cmd.detach().cpu())
+        dh.append(dh_prev.detach().cpu())
         times.append(end-start)
 
         i+=1
